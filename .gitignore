@@ -1,0 +1,27 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+build/
+dist/
+*.egg-info/
+
+.pytest_cache/
+.coverage
+htmlcov/
+
+.vscode/
+.idea/
+.history/
+*~
+
+# Saída de experimentos: os resultados são regeráveis a partir do dataset
+# + config. Versionar apenas os que forem citados em um artigo, à mão.
+experiments/results/
+
+# Pesos de modelo — grandes demais para o git; publicar em release/HF.
+*.pt
+*.onnx
+*.engine
+
+logs/

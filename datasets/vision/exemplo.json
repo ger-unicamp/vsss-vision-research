@@ -1,0 +1,19 @@
+{
+  "conditions": {
+    "illuminance_lux": 420,
+    "light_type": "cold",
+    "uniform": false,
+    "notes": "sombra no canto inferior esquerdo; luminaria central desligada"
+  },
+  "vision": {
+    "units": "m",
+    "robots": [
+      { "id": 0, "team": "own", "x": -0.30, "y": 0.12, "theta_deg": 35.0 },
+      { "id": 1, "team": "own", "x": -0.05, "y": -0.22, "theta_deg": 190.0 },
+      { "id": 2, "team": "own", "x": -0.60, "y": 0.0, "theta_deg": 0.0 },
+      { "id": 0, "team": "opponent", "x": 0.44, "y": -0.05 },
+      { "id": 1, "team": "opponent", "x": 0.60, "y": 0.30 }
+    ],
+    "ball": { "x": 0.0, "y": 0.0 }
+  }
+}

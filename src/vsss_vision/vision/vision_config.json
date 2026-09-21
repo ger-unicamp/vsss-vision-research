@@ -1,0 +1,91 @@
+{
+  "detector": "color",
+  "team_color": "yellow",
+  "robots_per_team": 3,
+  "camera_sub_address": "tcp://localhost:5555",
+  "field_length_m": 1.5,
+  "field_width_m": 1.3,
+  "alpha_pos": 0.5,
+  "alpha_angle": 0.4,
+  "stale_timeout_s": 1.0,
+  "min_area_robot": 100.0,
+  "min_area_ball": 50.0,
+  "min_area_marker": 20.0,
+  "max_marker_body_distance_px": 80.0,
+  "yolo_model_path": "models/best.pt",
+  "yolo_confidence": 0.25,
+  "own_color": {
+    "lower": [
+      90,
+      35,
+      0
+    ],
+    "upper": [
+      125,
+      255,
+      255
+    ]
+  },
+  "opponent_color": {
+    "lower": [
+      0,
+      120,
+      60
+    ],
+    "upper": [
+      10,
+      255,
+      255
+    ]
+  },
+  "ball_color": {
+    "lower": [
+      0,
+      40,
+      200
+    ],
+    "upper": [
+      35,
+      255,
+      225
+    ]
+  },
+  "markers": [
+    {
+      "lower": [
+        70,
+        50,
+        185
+      ],
+      "upper": [
+        100,
+        110,
+        230
+      ]
+    },
+    {
+      "lower": [
+        160,
+        55,
+        210
+      ],
+      "upper": [
+        180,
+        97,
+        255
+      ]
+    },
+    {
+      "lower": [
+        27,
+        16,
+        230
+      ],
+      "upper": [
+        39,
+        69,
+        255
+      ]
+    }
+  ]
+}

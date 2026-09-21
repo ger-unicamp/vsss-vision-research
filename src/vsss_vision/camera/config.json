@@ -1,0 +1,15 @@
+{
+  "camera_index": 2,
+  "roi_points": [],
+  "output_resolution": {
+    "width": 640,
+    "height": 480
+  },
+  "settings": {
+    "brightness": 83.0,
+    "contrast": 179.0,
+    "saturation": 128.0,
+    "exposure": 255.0,
+    "focus": 0.0
+  }
+}
