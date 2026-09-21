@@ -28,10 +28,14 @@ clássico mal calibrado não prova nada.
 
 | Variável | Níveis |
 | :--- | :--- |
-| Iluminância (lux, medida com luxímetro no plano do campo) | ≥ 4 níveis cobrindo do mínimo de competição ao excesso |
+| Iluminância (lux, medida com luxímetro no plano do campo) | **200, 400, 800, 1500** — a faixa típica de competição de futebol de robôs vai de 400 a 1500 lux, então 200 sonda abaixo do praticável e 1500 o teto |
 | Tipo de luz | fria, quente |
 | Uniformidade | uniforme; não uniforme (sombra); não uniforme (reflexo) |
-| Método | `color` (calibração única); `color` (recalibrado por condição); YOLO treinado com *augmentation* de brilho/contraste; YOLO sem *augmentation* |
+| Método | `color` (calibração única); `color` (recalibrado por condição); YOLO com braço de *augmentation* fotométrico; YOLO sem *augmentation* |
+
+Os dois braços de YOLO saem de `tools/train_yolo.py --augment brightness|none`.
+Rodar só o braço com *augmentation* e comparar com o clássico não separa
+ganho de arquitetura de ganho de *augmentation*.
 
 Registrar cada nível no bloco `conditions` do ground truth (ver
 `datasets/vision/README.md`) — é o que permite ao `bench` agrupar os resultados
@@ -56,14 +60,29 @@ Todas produzidas por `vsss-vision bench` (ver `benchmark/metrics.py`):
 - erro de orientação (graus): média, p95;
 - taxa de detecções perdidas;
 - taxa de identificações trocadas;
+- precisão, revocação e F1;
 - (protocolo 2) tempo de calibração, em minutos, por condição.
+
+Definições e denominadores em [`methodology.md`](methodology.md), seção 6.
+As duas correções em relação ao trabalho de referência — distância
+euclidiana em vez de soma com sinal, e diferença angular circular em vez de
+subtração crua — mudam os números do baseline clássico e precisam ser
+declaradas explicitamente no artigo, porque tornam os resultados **não
+diretamente comparáveis** com os reportados lá.
 
 ### Linhas de base
 
 - **Ballnet Pose** (`ayssag/BallnetPose`, Hugging Face) — modelo público do
-  trabalho de referência, avaliado sem re-treino sobre as cenas deste dataset.
-- **Sistema de visão atual do GER** — `ColorDetector` deste repositório, que é
-  o mesmo código que roda em competição.
+  trabalho de referência. Avaliável sem re-treino, mas com duas ressalvas a
+  declarar: as classes são por robô (`robot0/1/2`, camisas da UnBall), então
+  ele **não detecta adversário nenhum**, e foi treinado com camisas de outra
+  equipe. Configurar via `yolo_class_map` (ver
+  [`methodology.md`](methodology.md), seção 1) e reportar a taxa de
+  detecções perdidas separadamente para robôs próprios e adversários — do
+  contrário o número fica ilegível.
+- **Sistema de visão atual do GER** — `ColorDetector` deste repositório, o
+  mesmo código que roda em competição, recalibrado na condição de
+  referência (ver [`methodology.md`](methodology.md), seção 8).
 
 ## Requisitos de bancada
 

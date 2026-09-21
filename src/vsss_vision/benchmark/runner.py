@@ -43,6 +43,13 @@ class RunResult:
     latency: dict
     per_frame: list[FrameMetrics] = field(default_factory=list)
     config_snapshot: dict = field(default_factory=dict)
+    # Nome do ponto numa varredura (ex.: "yolo@320"). Só para rotular
+    # linhas de tabela e arquivos de saída.
+    label: str = ""
+
+    @property
+    def name(self) -> str:
+        return self.label or self.detector
 
     def by_illuminance(self) -> dict[Optional[float], Summary]:
         """Um resumo por nível de iluminância — a tabela principal da proposta P1."""
@@ -55,6 +62,7 @@ class RunResult:
     def as_dict(self) -> dict:
         return {
             "detector": self.detector,
+            "label": self.name,
             "dataset_root": self.dataset_root,
             "summary": self.summary.as_dict(),
             "latency": self.latency,
@@ -95,6 +103,7 @@ def run_benchmark(
     use_tracker: bool = True,
     match_radius_cm: float = DEFAULT_MATCH_RADIUS_CM,
     warmup_frames: int = 0,
+    label: str = "",
 ) -> RunResult:
     """Roda um detector sobre todas as cenas anotadas e devolve métricas + latência."""
 
@@ -109,6 +118,10 @@ def run_benchmark(
         stale_timeout_s=config.stale_timeout_s,
     )
     recorder = LatencyRecorder(warmup_frames=warmup_frames)
+    # Paga carga de pesos e alocação antes de medir qualquer coisa. Sem
+    # isso o primeiro frame carrega o custo do modelo inteiro e distorce
+    # média e máximo num dataset pequeno.
+    detector.warmup()
 
     per_frame: list[FrameMetrics] = []
     previous_source = None
@@ -131,16 +144,45 @@ def run_benchmark(
         summary=aggregate(per_frame),
         latency=recorder.as_dict(),
         per_frame=per_frame,
-        config_snapshot={
-            "detector": detector_name or config.detector,
-            "use_tracker": use_tracker,
-            "match_radius_cm": match_radius_cm,
-            "field_length_m": config.field_length_m,
-            "field_width_m": config.field_width_m,
-            "alpha_pos": config.alpha_pos,
-            "alpha_angle": config.alpha_angle,
-        },
+        label=label,
+        config_snapshot=_snapshot(config, detector_name, use_tracker, match_radius_cm),
     )
+
+
+def _snapshot(
+    config: VisionConfig, detector_name: Optional[str], use_tracker: bool, match_radius_cm: float
+) -> dict:
+    """Recorte da configuração que foi de fato usada.
+
+    Vai junto do resultado porque, sem ele, um número não é reproduzível:
+    o mesmo detector sobre o mesmo dataset dá resultados diferentes com
+    outra resolução de entrada, outro limiar de confiança ou outro raio de
+    casamento.
+    """
+
+    name = detector_name or config.detector
+    snapshot = {
+        "detector": name,
+        "use_tracker": use_tracker,
+        "match_radius_cm": match_radius_cm,
+        "field_length_m": config.field_length_m,
+        "field_width_m": config.field_width_m,
+        "alpha_pos": config.alpha_pos,
+        "alpha_angle": config.alpha_angle,
+    }
+    if name == "yolo":
+        snapshot.update(
+            yolo_model_path=config.yolo_model_path,
+            yolo_task=config.yolo_task,
+            yolo_imgsz=config.yolo_imgsz,
+            yolo_confidence=config.yolo_confidence,
+            yolo_iou=config.yolo_iou,
+            yolo_device=config.yolo_device,
+            yolo_half=config.yolo_half,
+            yolo_identity=config.yolo_identity,
+            yolo_class_map=config.yolo_class_map,
+        )
+    return snapshot
 
 
 def _evaluate_scene(
@@ -161,6 +203,13 @@ def _evaluate_scene(
         with recorder.stage("convert"):
             prediction = to_field_state(detection, config)
 
+    # Sub-estágios que o próprio detector mede (o YOLO separa
+    # pré-processamento, inferência e pós-processamento). Ficam ao lado de
+    # `detect`, não no lugar dele: a soma dos três não fecha com `detect`,
+    # e é a diferença que revela custo de marshalling escondido.
+    for stage, duration_ms in detector.profile().items():
+        recorder.record(stage, int(duration_ms * 1_000_000))
+
     return evaluate_frame(
         prediction=prediction,
         ground_truth=scene.ground_truth,
@@ -175,7 +224,7 @@ def format_summary(result: RunResult) -> str:
 
     summary = result.summary
     lines = [
-        f"detector={result.detector}  dataset={result.dataset_root}  frames={summary.frames}",
+        f"{result.name}  dataset={result.dataset_root}  frames={summary.frames}",
         f"  erro de posicao     media={summary.position_error_mean_cm:.2f} cm  "
         f"p95={summary.position_error_p95_cm:.2f} cm  max={summary.position_error_max_cm:.2f} cm",
         f"  erro de orientacao  media={summary.orientation_error_mean_deg:.2f} graus  "

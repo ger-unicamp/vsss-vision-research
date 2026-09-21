@@ -6,6 +6,7 @@ o carregamento, a conversão de unidades e o cálculo de métricas se
 encaixam — não avaliar a qualidade do detector, que é trabalho dos
 experimentos, não da suíte de testes.
 """
+import importlib.util
 import json
 
 import cv2
@@ -108,6 +109,12 @@ def test_benchmark_result_groups_by_illuminance_and_serializes(annotated_dataset
     assert "erro de posicao" in format_summary(result)
 
 
-def test_unimplemented_detector_fails_loudly(annotated_dataset):
-    with pytest.raises(NotImplementedError):
+@pytest.mark.skipif(
+    importlib.util.find_spec("ultralytics") is not None,
+    reason="extra yolo instalado: a mensagem de dependencia ausente nao se aplica",
+)
+def test_yolo_without_ultralytics_fails_with_an_actionable_message(annotated_dataset):
+    """Sem o extra instalado, o erro diz o que rodar — nao um ModuleNotFoundError cru."""
+
+    with pytest.raises(ImportError, match="uv sync --extra yolo"):
         run_benchmark(annotated_dataset, detector_name="yolo")

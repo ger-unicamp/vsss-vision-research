@@ -54,3 +54,23 @@ class Detector(ABC):
     @abstractmethod
     def detect(self, frame: np.ndarray) -> DetectionResult:
         """Detecta robôs e bola em `frame` (BGR, uint8) e devolve posições em pixel."""
+
+    def profile(self) -> dict[str, float]:
+        """Tempos internos do último `detect()`, em milissegundos.
+
+        Vazio por padrão. Um detector que já mede as próprias etapas (o
+        YOLO reporta pré-processamento, inferência e pós-processamento
+        separadamente) devolve esses tempos aqui, e o `LatencyRecorder` os
+        grava como estágios próprios. Sem isso, a proposta P2 só conseguiria
+        dizer "a inferência é lenta", nunca *qual parte* dela é lenta — e a
+        conclusão sobre qual variante usar muda se o custo estiver no
+        pré-processamento e não na rede.
+        """
+
+        return {}
+
+    def warmup(self) -> None:
+        """Paga custos de primeira execução (alocação, carga de pesos, JIT).
+
+        Chamado antes de qualquer medição. O padrão não faz nada.
+        """

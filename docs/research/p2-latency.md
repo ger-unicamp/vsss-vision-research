@@ -38,6 +38,16 @@ Reportar sempre média, p50, p95, p99 e máximo. Os primeiros frames são
 descartados (`--warmup`): incluem alocação de buffers e carga de pesos, que não
 representam o regime permanente.
 
+**Referência externa.** Na Small Size League, o atraso medido entre
+percepção e ação foi de **53 ms em média (máx. 74) a 50 fps** e **65 ms
+(máx. 99) a 30 fps** (Behnke et al., *Predicting Away Robot Control
+Latency*, RoboCup 2003) — e o trabalho trata o atraso como problema
+imanente da liga, a ponto de o atacar prevendo a posição futura do robô.
+Sistemas de *visual servoing* práticos operam entre ~46 e ~155 ms conforme a
+carga. Qualquer número obtido aqui deve ser situado nessa ordem de
+grandeza; um pipeline VSSS muito mais lento que isso não é apenas "lento",
+é qualitativamente outro regime de controle.
+
 A mesma instrumentação roda nos dois modos — offline (`vsss-vision bench`) e ao
 vivo (`vsss-vision live`) — então a comparação entre eles é direta e a diferença
 é atribuível ao que de fato muda: a câmera e o transporte.
@@ -49,8 +59,21 @@ vivo (`vsss-vision live`) — então a comparação entre eles é direta e a dif
 | Variável | Níveis |
 | :--- | :--- |
 | Detector | `color`; YOLO nano / small / medium / large / extra-large |
-| Resolução de entrada | pelo menos dois valores por variante |
+| Resolução de entrada | 320, 480, 640 (`--imgsz`) |
 | Hardware | **fixo** ao longo de todo o experimento; especificar CPU, GPU, memória e versões de driver no artigo |
+
+A varredura inteira sai de um comando:
+
+```bash
+uv run vsss-vision sweep --models n.pt s.pt m.pt l.pt x.pt \
+    --imgsz 320 480 640 --include-color \
+    --csv experiments/results/resumo.csv
+```
+
+Cada ponto grava seu próprio JSON com o recorte de configuração, e
+`curva_precisao_latencia.csv` reúne os pares (latência, erro) prontos para o
+gráfico. `--include-color` põe o pipeline clássico na mesma curva — é o
+ponto de referência que dá escala ao eixo.
 
 ### Variáveis dependentes
 

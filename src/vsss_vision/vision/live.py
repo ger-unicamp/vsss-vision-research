@@ -118,6 +118,7 @@ def run(
         stale_timeout_s=config.stale_timeout_s,
     )
     recorder = LatencyRecorder(warmup_frames=warmup_frames)
+    detector.warmup()
 
     context = zmq.Context()
     subscriber = context.socket(zmq.SUB)
@@ -154,6 +155,8 @@ def run(
                 with recorder.stage("publish"):
                     publish(state)
 
+            for stage, duration_ms in detector.profile().items():
+                recorder.record(stage, int(duration_ms * 1_000_000))
             recorder.end_frame()
             if report_every and recorder.frames and recorder.frames % report_every == 0:
                 _log_latency(recorder)

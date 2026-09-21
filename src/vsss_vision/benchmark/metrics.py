@@ -71,6 +71,14 @@ class Summary:
     id_swap_rate: float = float("nan")
     false_positive_rate: float = float("nan")
     ball_miss_rate: float = float("nan")
+    # Precisão/revocação sobre a associação espacial, não sobre IoU de
+    # caixas: o que importa para o laço de controle é se existe uma
+    # estimativa utilizável na posição certa, não o quanto duas caixas se
+    # sobrepõem. Reportar mAP ao lado disso é legítimo, mas mAP não diz em
+    # quantos centímetros o robô vai errar.
+    precision: float = float("nan")
+    recall: float = float("nan")
+    f1: float = float("nan")
 
     def as_dict(self) -> dict[str, float]:
         return {
@@ -85,6 +93,9 @@ class Summary:
             "id_swap_rate": self.id_swap_rate,
             "false_positive_rate": self.false_positive_rate,
             "ball_miss_rate": self.ball_miss_rate,
+            "precision": self.precision,
+            "recall": self.recall,
+            "f1": self.f1,
         }
 
 
@@ -163,6 +174,14 @@ def aggregate(frames: Sequence[FrameMetrics]) -> Summary:
     # dividir pelo total anotado misturaria o efeito de detecções perdidas.
     if total_matched:
         summary.id_swap_rate = total_swaps / total_matched
+    if total_matched + total_false_positives:
+        summary.precision = total_matched / (total_matched + total_false_positives)
+    if total_truth:
+        summary.recall = total_matched / total_truth
+    if summary.precision + summary.recall > 0 and not (
+        math.isnan(summary.precision) or math.isnan(summary.recall)
+    ):
+        summary.f1 = 2 * summary.precision * summary.recall / (summary.precision + summary.recall)
     if ball_frames:
         summary.ball_miss_rate = sum(1 for frame in ball_frames if frame.ball_missed) / len(ball_frames)
 

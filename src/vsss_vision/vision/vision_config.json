@@ -13,7 +13,31 @@
   "min_area_marker": 20.0,
   "max_marker_body_distance_px": 80.0,
   "yolo_model_path": "models/best.pt",
+  "yolo_task": "pose",
   "yolo_confidence": 0.25,
+  "yolo_iou": 0.5,
+  "yolo_imgsz": 640,
+  "yolo_device": "auto",
+  "yolo_half": false,
+  "yolo_max_detections": 16,
+  "yolo_class_map": {
+    "ball": {
+      "kind": "ball"
+    },
+    "robot_yellow": {
+      "kind": "robot",
+      "color": "yellow"
+    },
+    "robot_blue": {
+      "kind": "robot",
+      "color": "blue"
+    }
+  },
+  "yolo_keypoints": {
+    "front": 0,
+    "back": 1
+  },
+  "yolo_identity": "marker",
   "own_color": {
     "lower": [
       90,

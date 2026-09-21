@@ -59,10 +59,49 @@ class VisionConfig:
     # corpo de outro quando estão espalhados pelo campo.
     max_marker_body_distance_px: float = 80.0
 
-    # Caminho do modelo do detector por rede neural (`detector: "yolo"`).
-    # Fora do git por tamanho — ver .gitignore.
+    # --- Detector por rede neural (`detector: "yolo"`) ---------------------
+    # Pesos ficam fora do git por tamanho — ver .gitignore.
     yolo_model_path: str = "models/best.pt"
+    yolo_task: Literal["detect", "pose"] = "pose"
     yolo_confidence: float = 0.25
+    yolo_iou: float = 0.50
+    # Resolução de entrada da rede. É varrida na proposta P2 (precisão x
+    # latência), então precisa ser um parâmetro, não uma constante.
+    yolo_imgsz: int = 640
+    yolo_device: str = "auto"   # "auto" | "cpu" | "cuda:0" | "0"
+    yolo_half: bool = False     # fp16; só faz sentido em GPU
+    yolo_max_detections: int = 16
+
+    # Mapa de classes do modelo -> papel semântico. A chave é o NOME da
+    # classe como o modelo a expõe (`model.names`).
+    #
+    # O esquema padrão usa classes por COR DE TIME, não por robô. As regras
+    # do VSSS mandam que a cor de identificação alterne entre partidas e que
+    # a etiqueta seja destacável, então um modelo com classes por robô
+    # (`robot0`, `robot1`, `robot2`) fica preso às camisas de uma equipe e a
+    # uma cor — foi o que o trabalho de referência fez, e é por isso que o
+    # modelo público dele não detecta adversário nenhum. Com classes por cor,
+    # trocar de lado é mudar `team_color` na configuração, não retreinar.
+    #
+    # Um esquema por robô continua expressável (para reproduzir o trabalho de
+    # referência) acrescentando `"robot_id"` à entrada:
+    #   "robot0": {"kind": "robot", "color": "blue", "robot_id": 0}
+    yolo_class_map: dict[str, dict[str, Any]] = field(default_factory=lambda: {
+        "ball": {"kind": "ball"},
+        "robot_yellow": {"kind": "robot", "color": "yellow"},
+        "robot_blue": {"kind": "robot", "color": "blue"},
+    })
+
+    # Índices dos keypoints num modelo `pose`, usados para a orientação:
+    # theta = atan2(front - back). Mesma convenção do trabalho de referência.
+    yolo_keypoints: dict[str, int] = field(default_factory=lambda: {"front": 0, "back": 1})
+
+    # Como atribuir `robot_id` quando a classe não o carrega (esquema por cor).
+    #   "marker"     — marcador de cor dentro da caixa detectada (ids estáveis
+    #                  para o time próprio; é o que a equipe já cola no robô).
+    #   "positional" — ordem por área da caixa (ids instáveis; mesma limitação
+    #                  do ColorDetector para o adversário).
+    yolo_identity: Literal["marker", "positional"] = "marker"
 
     # Pontos de partida. TODOS devem ser recalibrados por câmera e por
     # condição de iluminação com tools/vision_calibrator.py: o custo dessa

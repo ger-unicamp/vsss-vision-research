@@ -42,11 +42,16 @@ aberturas que este repositório persegue:
 | Base pequena e pouco diversa: 653 imagens, um único evento (IronCup 2020), camisas de uma única equipe | Dataset próprio anotado com as camisas do GER, versionado junto do esquema |
 | Parte da avaliação qualitativa foi visual | Nenhuma métrica deste repositório depende de inspeção visual |
 | Não avalia o efeito da visão sobre controle, estratégia ou desempenho em jogo | Proposta P2, ver abaixo |
+| Erro de posição calculado como `\|(x−x₀)+(y−y₀)\|/2` — o módulo da **soma** com sinal, em que erros em X e Y se cancelam | Distância euclidiana, em centímetros |
+| Erro de orientação como `\|θ₀−θ\|`, sem redução circular (o texto chega a reportar um intervalo de "172,53 a 215,53 graus", impossível para diferença angular) | Diferença angular circular; parte dos 73°–97° atribuídos ao baseline é artefato de métrica |
+| Classes por robô (`robot0/1/2`, camisas de uma equipe): o modelo público **não detecta adversário nenhum** | Classes por **cor de time**; trocar de lado é mudar uma configuração, não retreinar |
+| 653 imagens de um único evento, sem separação por vídeo de origem — mAP50-95 de 0,99 é compatível com vazamento entre treino e teste | Divisão **por arquivo de origem**, nunca por frame |
 
-> Antes de escrever qualquer artigo, fazer uma busca de literatura mais ampla
-> (IEEE Xplore, SOL/SBC, anais do RoboCup) sobre visão com *deep learning* nas
-> ligas SSL e VSSS, para posicionar cada contribuição. Ver
-> [`docs/research/related-work.md`](docs/research/related-work.md).
+O levantamento completo — com o que foi verificado na leitura do TCC, os
+trabalhos de SSL/SPL/humanoide sobre iluminação e latência, e a busca
+sistemática que ainda falta antes de submeter — está em
+[`docs/research/related-work.md`](docs/research/related-work.md). Como cada
+decisão acima está implementada: [`docs/research/methodology.md`](docs/research/methodology.md).
 
 ---
 
@@ -124,6 +129,62 @@ sai `DetectionResult` em pixel. Tudo depois disso é comum a qualquer detector �
 
 ---
 
+## Detector por rede neural
+
+### Classes: por cor de time, não por robô
+
+```
+0  ball          1  robot_yellow          2  robot_blue
+```
+
+As regras mandam que a cor de identificação do time **alterne entre
+partidas**, com etiqueta destacável. Um modelo com classes por robô fica
+preso às camisas de uma equipe e a uma cor — é o que limita o modelo
+público de referência, que detecta os três robôs da própria equipe e a bola
+e **nenhum adversário**. Com classes por cor, trocar de lado é mudar
+`team_color` na configuração.
+
+A rede diz o **time**; quem é cada robô vem de `vision/identity.py`:
+marcador de cor procurado **dentro da caixa detectada** (time próprio) ou
+ordem posicional (adversário, que não tem marcador). Orientação vem dos
+keypoints `front`/`back` num modelo *pose*, ou do vetor corpo → marcador num
+modelo só de detecção.
+
+O mapa `yolo_class_map` em `vision_config.json` é a fonte única: alimenta o
+exportador de dataset **e** o detector, então treino e inferência não podem
+discordar sobre o que é a classe 1. O esquema por robô do trabalho de
+referência continua expressável, para comparação:
+
+```json
+"robot0": {"kind": "robot", "color": "blue", "robot_id": 0}
+```
+
+### Fine-tuning
+
+```bash
+uv sync --extra yolo
+make export-yolo            # anotações -> formato Ultralytics
+make train-yolo             # braço COM augmentation fotométrico
+make train-yolo-sem-augmentation   # braço de controle
+```
+
+As anotações guardam **centro em metros e ângulo**, não caixas. As caixas e
+os keypoints de treino são **derivados** das dimensões que a regra fixa
+(robô 7,5 cm, bola 42,7 mm) pela escala px/m do frame retificado — anotar um
+centro é muito mais barato que desenhar uma caixa, e o resultado é
+consistente entre amostras. Os dois keypoints da bola saem com visibilidade
+0: bola é homogênea, não tem frente nem trás.
+
+A divisão treino/validação/teste é **por arquivo de origem**. Frames
+vizinhos de um mesmo vídeo são quase idênticos; dividir por frame faz o
+teste medir memorização.
+
+Os dois braços de *augmentation* existem porque, sem o braço de controle,
+não se distingue ganho de arquitetura de ganho de *augmentation* — e é
+exatamente essa a hipótese H1 da P1.
+
+---
+
 ## Uso
 
 Requer Python 3.11+ e [`uv`](https://docs.astral.sh/uv/).
@@ -138,6 +199,10 @@ uv run vsss-vision bench --detector color --dataset datasets/vision --out out.js
 
 # Comparação lado a lado, mesmas cenas e mesma calibração
 make compare
+uv run vsss-vision compare --csv resumo.csv --markdown tabela.md
+
+# Curva precisão x latência (P2): variantes x resoluções, hardware fixo
+uv run vsss-vision sweep --models n.pt s.pt x.pt --imgsz 320 480 640 --include-color
 
 # Pipeline ao vivo, com latência instrumentada (em outro terminal: make camera-service)
 make live
@@ -152,8 +217,9 @@ make calibrate-camera     # ROI de 4 pontos nos cantos físicos do campo
 make calibrate-colors     # faixas HSV por perfil (own, opponent, ball, marcadores)
 ```
 
-O detector por rede neural exige `uv sync --extra yolo` e ainda **não está
-implementado** — o roteiro está em `src/vsss_vision/vision/detectors/yolo.py`.
+O detector por rede neural exige `uv sync --extra yolo` e pesos treinados;
+o extra fica de fora da instalação padrão para manter o pipeline clássico
+leve o bastante para rodar em hardware de competição.
 
 ---
 
@@ -179,8 +245,12 @@ irmão são ignorados pelo carregador.
 ## Reprodutibilidade
 
 - Cada execução do `bench` grava um JSON com as métricas, a latência **e um
-  recorte da configuração usada** (detector, escala do campo, parâmetros de
-  suavização, raio de casamento). A configuração faz parte do resultado.
+  recorte da configuração usada** (detector, pesos, `imgsz`, confiança,
+  dispositivo, escala do campo, parâmetros de suavização, raio de
+  casamento). A configuração faz parte do resultado: o mesmo detector sobre
+  o mesmo dataset dá números diferentes com outra resolução de entrada.
+- `--csv` e `--markdown` exportam a tabela agregada; o JSON continua sendo a
+  fonte canônica e os dois são regeráveis a partir dele.
 - `experiments/results/` está no `.gitignore`: resultados são regeráveis a partir
   do dataset e da configuração. Versionar à mão apenas os que forem citados em um
   artigo, junto do commit exato que os gerou.
